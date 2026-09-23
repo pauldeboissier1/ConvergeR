@@ -28,3 +28,5 @@ Suggests:
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 biocViews: Software, SingleCell, Transcriptomics, GeneExpression
+URL: https://gitlab.com/pauldeboissier/ConvergeR
+BugReports: https://gitlab.com/pauldeboissier/ConvergeR/-/issues

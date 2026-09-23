@@ -33,9 +33,9 @@
 #'
 #' # 2. Importing MSigDB Signatures and Scoring
 #' if (requireNamespace("msigdbr", quietly = TRUE)) {
-#'   hallmark_sets <- msigdbr::msigdbr(species = "Homo sapiens", category = "H")
-#'   raw_group1 <- hallmark_sets[hallmark_sets$gs_name == "HALLMARK_INTERFERON_ALPHA_RESPONSE", ]$gene_symbol
-#'   raw_group2 <- hallmark_sets[hallmark_sets$gs_name == "HALLMARK_INFLAMMATORY_RESPONSE", ]$gene_symbol
+#'   hs <- msigdbr::msigdbr(species = "Homo sapiens", category = "H")
+#'   raw_group1 <- hs[hs$gs_name == "HALLMARK_INTERFERON_ALPHA_RESPONSE", ]$gene_symbol
+#'   raw_group2 <- hs[hs$gs_name == "HALLMARK_INFLAMMATORY_RESPONSE", ]$gene_symbol
 #'
 #'   group1_genes <- intersect(raw_group1, rownames(seu))
 #'   group2_genes <- intersect(raw_group2, rownames(seu))
