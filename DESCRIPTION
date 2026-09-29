@@ -1,10 +1,10 @@
 Package: ConvergeR
 Title: Whitfield Convergence Score and Seurat Metadata Association
-Version: 0.99.0
+Version: 0.99.1
 Authors@R: 
     person('Paul', 'de Boissier', , 'paul.deboissier04@gmail.com', role = c('aut','cre'), comment = c(ORCID = "0000-0003-2246-1580"))
 Description: Calculates the convergence score defined by Whitfield et al. 2026 
-    (doi: 10.1158/0008-5472.CAN-25-4403). It allows visualization of this score 
+    <doi:10.1158/0008-5472.CAN-25-4403>. It allows visualization of this score 
     alongside qualitative and quantitative Seurat object metadata via barplots 
     and density curves, and runs appropriate statistical tests for associations.
 Depends: R (>= 4.4.0)

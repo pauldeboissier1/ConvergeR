@@ -47,19 +47,30 @@ scores. Each group can be made of a single score or a combination of several
 scores; the underlying methodology is identical either way.
 }
 \examples{
-# 1. Environment Setup and Data Preparation
 seu_path <- system.file("extdata", "pbmc3k_subset.rds", package = "ConvergeR")
 seu <- readRDS(seu_path)
-seu <- Seurat::NormalizeData(seu, verbose = FALSE)
 
+# Simulated module scores (fast)
 set.seed(42)
-seu$age <- sample(20:70, ncol(seu), replace = TRUE)
-seu$tumor_status <- sample(c("Primary", "Metastatic"), ncol(seu), replace = TRUE)
-seu$treatment <- sample(c("Treated", "Untreated"), ncol(seu), replace = TRUE)
-seu$SS <- paste0("Patient_", sample(1:5, ncol(seu), replace = TRUE))
+seu$Score_IFN <- rnorm(ncol(seu))
+seu$Score_Inflam <- rnorm(ncol(seu))
 
-# 2. Importing MSigDB Signatures and Scoring
+seu <- CalculateConvergedScore(
+  seurat_obj = seu,
+  principal_score = "Score_IFN",
+  other_scores = "Score_Inflam",
+  principal_name = "Interferon",
+  other_name = "Inflammatory",
+  output_colname = "Converged_Immune",
+  principal_color = "#9b59b6",
+  other_color = "#e67e22"
+)
+head(seu@meta.data[, c("Converged_Immune", "Converged_Immune_Direction")])
+
+\donttest{
+# Full workflow with MSigDB signatures (slower, requires msigdbr)
 if (requireNamespace("msigdbr", quietly = TRUE)) {
+  seu <- Seurat::NormalizeData(seu, verbose = FALSE)
   hs <- msigdbr::msigdbr(species = "Homo sapiens", category = "H")
   raw_group1 <- hs[hs$gs_name == "HALLMARK_INTERFERON_ALPHA_RESPONSE", ]$gene_symbol
   raw_group2 <- hs[hs$gs_name == "HALLMARK_INFLAMMATORY_RESPONSE", ]$gene_symbol
@@ -72,17 +83,13 @@ if (requireNamespace("msigdbr", quietly = TRUE)) {
   seu$Score_IFN <- seu$Score_IFN_1
   seu$Score_Inflam <- seu$Score_Inflam_1
 
-  # 3. Computing the Convergence Score
   seu <- CalculateConvergedScore(
     seurat_obj = seu,
     principal_score = "Score_IFN",
     other_scores = "Score_Inflam",
-    principal_name = "Interferon",
-    other_name = "Inflammatory",
-    output_colname = "Converged_Immune",
-    principal_color = "#9b59b6",
-    other_color = "#e67e22"
+    output_colname = "Converged_Immune_MSigDB"
   )
+}
 }
 }
 \references{
