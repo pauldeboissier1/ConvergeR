@@ -10,7 +10,30 @@ import(Seurat)
 import(SeuratObject)
 import(dplyr)
 import(ggplot2)
+importFrom(SingleCellExperiment,SingleCellExperiment)
+importFrom(dplyr,
+  across,
+  all_of,
+  group_by,
+  summarise,
+  transmute
+)
+importFrom(ggplot2,
+  aes,
+  element_text,
+  facet_grid,
+  geom_bar,
+  geom_density,
+  geom_hline,
+  ggplot,
+  labs,
+  scale_fill_manual,
+  theme,
+  theme_classic,
+  vars
+)
 importFrom(magrittr,"%>%")
+importFrom(rlang,.data)
 importFrom(stats,
   as.formula,
   complete.cases,

@@ -1,0 +1,300 @@
+---
+title: "Introduction to ConvergeR"
+author: "Paul de Boissier"
+date: "`r Sys.Date()`"
+output: BiocStyle::html_document
+vignette: >
+  %\VignetteIndexEntry{Introduction to ConvergeR}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  warning = FALSE,
+  message = TRUE
+)
+
+# The Seurat section of this vignette is only evaluated when SeuratObject is
+# installed (it is a suggested, not a required, dependency).
+has_seurat <- requireNamespace("SeuratObject", quietly = TRUE)
+```
+
+# Introduction
+
+**ConvergeR** is an analytical toolkit designed to compute, visualize, and
+statistically evaluate the convergence of single-cell states, based on the
+methodology established by
+[Whitfield et al. (2026)](https://doi.org/10.1158/0008-5472.can-25-4403).
+
+All functions work directly on a `SingleCellExperiment` object (or any
+`SummarizedExperiment`) as well as on a `Seurat` object. They only read and write
+the cell-level metadata (`colData()` for a `SingleCellExperiment`, `meta.data`
+for a `Seurat` object): the object is never converted, and is returned with its
+original class and all its content (assays, reduced dimensions, ...) untouched,
+with the new score columns added to the cell metadata.
+
+In this vignette, we demonstrate the package workflow on a subset of the PBMC3k
+dataset (Peripheral Blood Mononuclear Cells). For each cell, we evaluate the
+balance between two opposing programs from the MSigDB Hallmark collection:
+the interferon alpha response versus the inflammatory response. The main
+workflow uses a `SingleCellExperiment`; a short section at the end shows that
+the exact same calls work on a `Seurat` object.
+
+# 1. Environment Setup and Data Preparation
+
+Let's load the required packages and the lightweight subset of the PBMC dataset
+bundled with the package.
+
+```{r}
+library(ConvergeR)
+library(SingleCellExperiment)
+library(ggplot2)
+
+# Load the built-in example dataset
+sce_path <- system.file("extdata", "pbmc3k_subset_sce.rds", package = "ConvergeR")
+sce <- readRDS(sce_path)
+sce
+```
+
+To simulate a multi-patient cohort, we inject mock clinical metadata. Patient-level
+covariates (age, tumor status, treatment) are constant within a patient, which is
+what the patient-level tests below assume. These data are simulated, so the
+results shown in this vignette have no biological meaning.
+
+```{r}
+set.seed(42)
+
+patients <- paste0("Patient_", 1:8)
+clinical <- data.frame(
+  SS = patients,
+  age = c(25, 33, 47, 52, 68, 41, 59, 36),
+  tumor_status = rep(c("Primary", "Metastatic"), 4),
+  treatment = rep(c("Treated", "Treated", "Untreated", "Untreated"), 2)
+)
+
+# Randomly assign each cell to a patient, then copy the patient's covariates
+sce$SS <- sample(patients, ncol(sce), replace = TRUE)
+idx <- match(sce$SS, clinical$SS)
+sce$age <- clinical$age[idx]
+sce$tumor_status <- clinical$tumor_status[idx]
+sce$treatment <- clinical$treatment[idx]
+```
+
+# 2. Importing MSigDB Signatures and Scoring
+
+Instead of manually importing `.gmt` files, we use the `msigdbr` package to
+directly retrieve the official Hallmark signatures.
+
+```{r}
+library(msigdbr)
+
+hallmark_sets <- msigdbr(species = "Homo sapiens", category = "H")
+
+raw_group1 <- hallmark_sets[hallmark_sets$gs_name == "HALLMARK_INTERFERON_ALPHA_RESPONSE", ]$gene_symbol
+raw_group2 <- hallmark_sets[hallmark_sets$gs_name == "HALLMARK_INFLAMMATORY_RESPONSE", ]$gene_symbol
+
+# Keep only the genes actually present in the dataset
+group1_genes <- intersect(raw_group1, rownames(sce))
+group2_genes <- intersect(raw_group2, rownames(sce))
+```
+
+ConvergeR only needs one numeric score per cell and per program, stored in the cell
+metadata. Any scoring method can be used (for example `AUCell`, `UCell` or
+`singscore`; `AddModuleScore()` for Seurat objects). For simplicity, we use here the
+mean log-normalized expression of each signature.
+
+```{r}
+sce <- scuttle::logNormCounts(sce)
+
+sce$Score_IFN <- colMeans(as.matrix(logcounts(sce)[group1_genes, , drop = FALSE]))
+sce$Score_Inflam <- colMeans(as.matrix(logcounts(sce)[group2_genes, , drop = FALSE]))
+```
+
+# 3. Computing the Convergence Score
+
+`CalculateConvergedScore()` standardizes each score (Z-score), combines the scores
+of each group, rescales them to $[0, 1]$ and returns their log2 ratio. A positive
+value means that the cell converges towards the principal group, a negative value
+towards the other group. Each group can be made of a single score or of several
+scores (`principal_score = c("Score_A", "Score_B")`).
+
+```{r}
+sce <- CalculateConvergedScore(
+  object = sce,
+  principal_score = "Score_IFN",
+  other_scores = "Score_Inflam",
+  principal_name = "Interferon",
+  other_name = "Inflammatory",
+  output_colname = "Converged_Immune",
+  principal_color = "#9b59b6", # Purple for Interferon
+  other_color = "#e67e22"      # Orange for Inflammatory
+)
+
+head(colData(sce)[, c("Converged_Immune", "Converged_Immune_Direction")])
+table(sce$Converged_Immune_Direction)
+```
+
+# 4. Visualization
+
+ConvergeR automatically reads the color metadata generated in the previous step to
+produce standardized plots.
+
+## Proportion Barplot
+
+Proportion of cells converging to either Immune state across our 8 mock patients.
+
+```{r, fig.width=8, fig.height=5, fig.align='center'}
+PlotConvergenceProportion(
+  object = sce,
+  x_var = "SS",
+  fill_var = "Converged_Immune_Direction",
+  title = "Immune Convergence by Patient"
+)
+```
+
+## Crossed Proportion Barplot
+
+Faceted by tumor status to identify subgroup trends.
+
+```{r, fig.width=8, fig.height=5, fig.align='center'}
+PlotConvergenceCrossedProportion(
+  object = sce,
+  x_var = "SS",
+  fill_var = "Converged_Immune_Direction",
+  facet_var = "tumor_status",
+  title = "Immune Convergence split by Tumor Status"
+)
+```
+
+## Density Distribution
+
+Continuous relationship of the convergence direction with patient age.
+
+```{r, fig.width=8, fig.height=5, fig.align='center'}
+PlotConvergenceDensity(
+  object = sce,
+  x_var = "age",
+  fill_var = "Converged_Immune_Direction",
+  x_label = "Patient Age"
+)
+```
+
+# 5. Statistical Testing
+
+We evaluate the statistical significance at the patient level (pseudobulk) to
+prevent pseudoreplication bias caused by single-cell testing.
+
+## Bivariate Test
+
+```{r}
+TestConvergenceScore(
+  object = sce,
+  score_var = "Converged_Immune",
+  test_var = "age",
+  level = "patient",
+  patient_id_var = "SS"
+)
+```
+
+**How to read this result:** The output message displays the statistical test used
+(e.g., Spearman correlation for continuous variables), the analysis level
+(patient pseudobulk to avoid single-cell pseudoreplication), the number of
+observations ($N$ patients), and the p-value. A p-value below 0.05 indicates a
+statistically significant association between the convergence score and the
+tested variable.
+
+## Multivariate Linear Model
+
+```{r}
+TestMultivariateConvergence(
+  object = sce,
+  score_var = "Converged_Immune",
+  test_vars = c("age", "tumor_status", "treatment"),
+  level = "patient",
+  patient_id_var = "SS"
+)
+```
+
+**How to read this result:** This model fits a multivariable linear regression on
+pseudobulk data. It details the global model performance ($R^2$ and global
+p-value) and breaks down the independent effect (Estimate) and significance
+(p-value accompanied by conventional significance stars) for each covariate,
+allowing you to assess the effect of a variable while controlling for potential
+confounders.
+
+# 6. Working with Seurat Objects
+
+The same functions accept a `Seurat` object, with the same arguments. Here we build
+a `Seurat` object from the counts and the metadata of the `SingleCellExperiment`
+used above (before the convergence score was computed).
+
+```{r, eval = has_seurat}
+seu <- SeuratObject::CreateSeuratObject(
+  counts = counts(sce),
+  meta.data = as.data.frame(
+    colData(sce)[, c("SS", "age", "tumor_status", "treatment",
+                     "Score_IFN", "Score_Inflam")]
+  )
+)
+```
+
+With a `Seurat` object, the module scores would typically be computed with
+`Seurat::AddModuleScore()`:
+
+```{r, eval = FALSE}
+seu <- Seurat::NormalizeData(seu)
+seu <- Seurat::AddModuleScore(seu, features = list(group1_genes), name = "Score_IFN_")
+seu <- Seurat::AddModuleScore(seu, features = list(group2_genes), name = "Score_Inflam_")
+seu$Score_IFN <- seu$Score_IFN_1
+seu$Score_Inflam <- seu$Score_Inflam_1
+```
+
+Here we simply reuse the scores computed above so that both objects can be
+compared. The convergence score is then computed, plotted and tested exactly as
+for the `SingleCellExperiment`:
+
+```{r, eval = has_seurat}
+seu <- CalculateConvergedScore(
+  object = seu,
+  principal_score = "Score_IFN",
+  other_scores = "Score_Inflam",
+  principal_name = "Interferon",
+  other_name = "Inflammatory",
+  output_colname = "Converged_Immune",
+  principal_color = "#9b59b6",
+  other_color = "#e67e22"
+)
+
+class(seu)
+
+# Same result as with the SingleCellExperiment
+all.equal(unname(seu$Converged_Immune), unname(sce$Converged_Immune))
+```
+
+```{r, fig.width=8, fig.height=5, fig.align='center', eval = has_seurat}
+PlotConvergenceProportion(
+  object = seu,
+  x_var = "SS",
+  fill_var = "Converged_Immune_Direction",
+  title = "Immune Convergence by Patient (Seurat object)"
+)
+```
+
+```{r, eval = has_seurat}
+TestConvergenceScore(
+  object = seu,
+  score_var = "Converged_Immune",
+  test_var = "age",
+  level = "patient",
+  patient_id_var = "SS"
+)
+```
+
+# Session Information
+
+```{r}
+sessionInfo()
+```

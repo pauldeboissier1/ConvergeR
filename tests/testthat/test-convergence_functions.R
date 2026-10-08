@@ -23,7 +23,7 @@ seu$SS <- paste0("SS", sample(1:5, ncol(seu), replace = TRUE))
 test_that("CalculateConvergedScore generates correct metadata columns", {
 
   seu_res <- CalculateConvergedScore(
-    seurat_obj = seu,
+    object = seu,
     principal_score = "scoreSeurat_Muscle",
     other_scores = "scoreSeurat_Fibrous",
     principal_name = "Muscle",
@@ -74,7 +74,7 @@ test_that("Statistical tests return appropriate model objects", {
   # Bivariate test (suppressMessages prevents console clutter during testing)
   res_biv <- suppressMessages(
     TestConvergenceScore(
-      seurat_obj = seu_res,
+      object = seu_res,
       score_var = "Converged_Score",
       test_var = "age",
       level = "patient",
@@ -87,7 +87,7 @@ test_that("Statistical tests return appropriate model objects", {
   # Multivariate test
   res_multi <- suppressMessages(
     TestMultivariateConvergence(
-      seurat_obj = seu_res,
+      object = seu_res,
       score_var = "Converged_Score",
       test_vars = c("age", "tumor_status"),
       level = "patient",
