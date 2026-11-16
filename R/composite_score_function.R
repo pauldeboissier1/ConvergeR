@@ -440,7 +440,6 @@ TestConvergenceScore <- function(seurat_obj,
   if (is.numeric(df_test$.var)) {
     test_type <- "Spearman correlation"
     result <- cor.test(df_test$.score, df_test$.var, method = "spearman")
-    print(result)
   } else {
     grp <- droplevels(as.factor(df_test$.var))
     n_levels <- nlevels(grp)
@@ -461,7 +460,8 @@ TestConvergenceScore <- function(seurat_obj,
     " | level: ", ifelse(level == "patient", "patient (pseudobulk)", "cell"),
     " | N = ", nrow(df_test),
     " | testing '", score_var, "' by '", test_var, "'",
-    " | p = ", format.pval(result$p.value, digits = 3)
+    " | p = ", format.pval(result$p.value, digits = 3),
+    ifelse(test_type == "Spearman correlation", paste0(" | rho = ", result$rho), "")
   )
 
   return(invisible(result))
