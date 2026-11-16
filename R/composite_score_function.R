@@ -461,7 +461,7 @@ TestConvergenceScore <- function(seurat_obj,
     " | N = ", nrow(df_test),
     " | testing '", score_var, "' by '", test_var, "'",
     " | p = ", format.pval(result$p.value, digits = 3),
-    ifelse(test_type == "Spearman correlation", paste0(" | rho = ", result$rho), "")
+    ifelse(test_type == "Spearman correlation", paste0(" | rho = ", round(result$estimate, digits = 4)), "")
   )
 
   return(invisible(result))
