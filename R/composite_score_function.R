@@ -440,6 +440,7 @@ TestConvergenceScore <- function(seurat_obj,
   if (is.numeric(df_test$.var)) {
     test_type <- "Spearman correlation"
     result <- cor.test(df_test$.score, df_test$.var, method = "spearman")
+    print(result)
   } else {
     grp <- droplevels(as.factor(df_test$.var))
     n_levels <- nlevels(grp)
